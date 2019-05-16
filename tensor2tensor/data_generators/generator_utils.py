@@ -37,6 +37,8 @@ from tensor2tensor.utils import mlperf_log
 
 import tensorflow as tf
 
+from tensorflow.core.example.example_pb2 import Example
+
 UNSHUFFLED_SUFFIX = "-unshuffled"
 
 
@@ -46,7 +48,7 @@ def to_example(dictionary):
   for (k, v) in six.iteritems(dictionary):
     if not v:
       raise ValueError("Empty generated field: %s" % str((k, v)))
-    if str(type(v)) == "<class 'tensorflow.core.example.example_pb2.Example'>":
+    if isinstance(v, Example):
       return v
     if isinstance(v[0], six.integer_types):
       features[k] = tf.train.Feature(int64_list=tf.train.Int64List(value=v))
