@@ -322,8 +322,9 @@ class T2TModel(base.Layer):
       sharded_features = self._shard_features(features)
       sharded_logits, losses = self.model_fn_sharded(sharded_features)
       if (sharded_logits[0].__class__.__name__ == 'HideDict'):
+        assert len(sharded_logits) == 1, "bad length"
         sharded_logits = sharded_logits[0].d
-      if isinstance(sharded_logits, dict) or (sharded_logits.__class__.__name__ == 'HideDict'):
+      if isinstance(sharded_logits, dict):
         concat_logits = {}
         for k, v in six.iteritems(sharded_logits):
           concat_logits[k] = tf.concat(v, 0)
