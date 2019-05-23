@@ -50,6 +50,7 @@ from tensorflow.python.ops import inplace_ops
 from tensorflow.python.ops import variable_scope
 from tensorflow.python.util import tf_inspect as inspect
 
+
 _no_problem_err_str = (
     "The default implementation of %s requires that the "
     "model be used with a Problem. If using a Problem, augment the "
@@ -320,7 +321,9 @@ class T2TModel(base.Layer):
       summarize_features(features, num_shards=self._num_datashards)
       sharded_features = self._shard_features(features)
       sharded_logits, losses = self.model_fn_sharded(sharded_features)
-      if isinstance(sharded_logits, dict):
+      if (sharded_logits[0].__class__.__name__ == 'HideDict'):
+        sharded_logits = sharded_logits[0].d
+      if isinstance(sharded_logits, dict) or (sharded_logits.__class__.__name__ == 'HideDict'):
         concat_logits = {}
         for k, v in six.iteritems(sharded_logits):
           concat_logits[k] = tf.concat(v, 0)
