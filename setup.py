@@ -56,7 +56,7 @@ setup(
         'six',
         'sympy',
         'tensorflow-datasets',
-        'tensorflow-probability',
+        'tensorflow-probability==0.6.0',
         'tqdm',
     ],
     extras_require={
