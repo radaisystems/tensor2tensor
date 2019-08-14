@@ -2941,16 +2941,51 @@ def list_product(els):
   return prod
 
 
-def sample_with_temperature(logits, temperature, sampling_keep_top_k=-1):
-  """Either argmax or random sampling.
+#def sample_with_temperature(logits, temperature, sampling_keep_top_k=-1):
+#  """Either argmax or random sampling.
+#
+#  Args:
+#    logits: a Tensor.
+#    temperature: a float  0.0=argmax 1.0=random
+#    sampling_keep_top_k: If not -1, only sample from the top k logits.
+#  Returns:
+#    a Tensor with one fewer dimension than logits.
+#  """
+#  if temperature == 0.0:
+#    # TF argmax doesn't handle >5 dimensions, so we reshape here.
+#    logits_shape = shape_list(logits)
+#    argmax = tf.argmax(tf.reshape(logits, [-1, logits_shape[-1]]), axis=1)
+#    return tf.reshape(argmax, logits_shape[:-1])
+#  else:
+#    assert temperature > 0.0
+#
+#    if sampling_keep_top_k != -1:
+#      if sampling_keep_top_k <= 0:
+#        raise ValueError("sampling_keep_top_k must either be -1 or positive.")
+#
+#      vocab_size = shape_list(logits)[1]
+#
+#      k_largest = tf.contrib.nn.nth_element(
+#          logits, n=sampling_keep_top_k, reverse=True)
+#      k_largest = tf.tile(tf.reshape(k_largest, [-1, 1]), [1, vocab_size])
+#
+#      # Force every position that is not in the top k to have probability near
+#      # 0 by setting the logit to be very negative.
+#      logits = tf.where(tf.less_equal(logits, k_largest),
+#                        tf.ones_like(logits)*-1e6, logits)
+#
+#    reshaped_logits = (
+#        tf.reshape(logits, [-1, shape_list(logits)[-1]]) / temperature)
+#    choices = tf.multinomial(reshaped_logits, 1)
+#    choices = tf.reshape(choices,
+#                         shape_list(logits)[:logits.get_shape().ndims - 1])
+#    return choices
 
-  Args:
-    logits: a Tensor.
-    temperature: a float  0.0=argmax 1.0=random
-    sampling_keep_top_k: If not -1, only sample from the top k logits.
-  Returns:
-    a Tensor with one fewer dimension than logits.
-  """
+
+def sample_with_temperature(logits, temperature, top_p=0.9, **kwargs):
+  """function override to use nucleus sampling in t2t"""
+  # note - this only runs for greedy decoding.
+  # set temperature with hparams.sampling_temp
   if temperature == 0.0:
     # TF argmax doesn't handle >5 dimensions, so we reshape here.
     logits_shape = shape_list(logits)
@@ -2959,23 +2994,23 @@ def sample_with_temperature(logits, temperature, sampling_keep_top_k=-1):
   else:
     assert temperature > 0.0
 
-    if sampling_keep_top_k != -1:
-      if sampling_keep_top_k <= 0:
-        raise ValueError("sampling_keep_top_k must either be -1 or positive.")
+    logits = (logits / temperature)
+    if top_p != -1:
+      if top_p <= 0:
+        raise ValueError("top_p must either be -1 or positive.")
 
-      vocab_size = shape_list(logits)[1]
-
-      k_largest = tf.contrib.nn.nth_element(
-          logits, n=sampling_keep_top_k, reverse=True)
-      k_largest = tf.tile(tf.reshape(k_largest, [-1, 1]), [1, vocab_size])
-
-      # Force every position that is not in the top k to have probability near
-      # 0 by setting the logit to be very negative.
-      logits = tf.where(tf.less_equal(logits, k_largest),
-                        tf.ones_like(logits)*-1e6, logits)
-
-    reshaped_logits = (
-        tf.reshape(logits, [-1, shape_list(logits)[-1]]) / temperature)
+    with tf.variable_scope('top_p_logits'):
+      logits_sort = tf.sort(logits, axis=-1, direction='DESCENDING')
+      probs_sort = tf.nn.softmax(logits_sort)
+      probs_sums = tf.cumsum(probs_sort, axis=1, exclusive=True)
+      logits_masked = tf.where(probs_sums < top_p, logits_sort, tf.ones_like(logits_sort)*1000)
+      min_logits = tf.reduce_min(logits_masked, axis=1, keepdims=True)
+      logits = tf.where(
+        logits < min_logits,
+        tf.ones_like(logits, dtype=logits.dtype) * -1e10,
+        logits,
+      )
+    reshaped_logits = tf.reshape(logits, [-1, shape_list(logits)[-1]])
     choices = tf.multinomial(reshaped_logits, 1)
     choices = tf.reshape(choices,
                          shape_list(logits)[:logits.get_shape().ndims - 1])
