@@ -2982,10 +2982,12 @@ def list_product(els):
 #    return choices
 
 
-def sample_with_temperature(logits, temperature, top_p=0.9, **kwargs):
+def sample_with_temperature(logits, temperature, sampling_keep_top_k=0.9):
   """function override to use nucleus sampling in t2t"""
   # note - this only runs for greedy decoding.
   # set temperature with hparams.sampling_temp
+  # also - hijacking the sampling_keep_top_k hparam to use instead as top_p
+  top_p = sampling_keep_top_k
   if temperature == 0.0:
     # TF argmax doesn't handle >5 dimensions, so we reshape here.
     logits_shape = shape_list(logits)
