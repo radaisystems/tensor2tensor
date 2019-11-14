@@ -55,7 +55,7 @@ setup(
         'scipy',
         'six',
         'sympy',
-        'tensorflow-datasets',
+        'tensorflow-datasets==1.2.0',
         'tensorflow-probability==0.6.0',
         'tqdm',
     ],
